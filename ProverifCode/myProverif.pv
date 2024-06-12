@@ -1,0 +1,253 @@
+(* proverif 2.04 *)
+free DataA:bitstring [private].    (*r1 *)
+free DataB:bitstring [private].    (*IDA*)
+free DataC:bitstring [private].    (*X_GWN_A*)
+
+free DataD:bitstring [private].    (*r2*)
+free DataF:bitstring [private].	   (*IDB*)
+free DataE:bitstring [private].    (*X_GWN_B*)
+free DataG:bitstring [private].    (*sk *)
+
+
+
+
+(*communication channel *)
+free A2RC : channel [private].
+free B2RC : channel [private].
+free A2GWN_PRIVATE : channel [private].
+free B2GWN_PRIVATE : channel [private].
+
+free A2GWN : channel.
+free B2GWN : channel.
+const G : bitstring. (* Public Terms *) 
+
+(*Constructor*)
+fun XOR(bitstring, bitstring) : bitstring. (* Exclusive OR *) 
+fun Concat(bitstring, bitstring) : bitstring. 
+fun Hash1(bitstring) : bitstring. 
+fun Hash2(bitstring, bitstring) : bitstring. 
+fun Hash3(bitstring, bitstring, bitstring) : bitstring. 
+fun Hash4(bitstring, bitstring, bitstring, bitstring) : bitstring. 
+fun Hash5(bitstring, bitstring, bitstring, bitstring, bitstring) :bitstring. 
+fun Response(bitstring) : bitstring.
+
+fun a_mul_G(bitstring, bitstring) : bitstring. (* a*P *) 
+fun CH(bitstring, bitstring, bitstring): bitstring. 
+fun get_kA_star(bitstring, bitstring, bitstring): bitstring.
+fun get_m1(bitstring, bitstring, bitstring): bitstring.
+fun get_new_CH(bitstring, bitstring, bitstring): bitstring.
+fun aenc(bitstring,bitstring) : bitstring.
+
+(*Destructor function*)
+reduc forall m1 : bitstring, m2 : bitstring; Separate1(Concat(m1, m2)) = m1. 
+reduc forall m1 : bitstring, m2 : bitstring; Separate2(Concat(m1, m2)) = m2. 
+reduc forall m1 : bitstring, m2 : bitstring; DXOR_getSecond(XOR(m1, m2), m1) = m2. 
+reduc forall m1 : bitstring, m2 : bitstring; DXOR_getFirst(XOR(m1, m2), m2) = m1. 
+reduc forall m0 : bitstring, r1 : bitstring,r0:bitstring,x:bitstring,G:bitstring; D_get_new_CH(get_new_CH(get_m1(get_kA_star(m0,r0,x),r1,x), r1,a_mul_G(x,G))) = x. 
+
+
+ (*create Table*)
+table NodeAsTable(bitstring,bitstring,bitstring,bitstring). 
+table DeviceTable(bitstring,bitstring,bitstring,bitstring).
+
+ (*eight event*)
+event GWN_Device_begin(bitstring).
+event Device_GWN_end(bitstring).
+event GWN_NodeA_begin(bitstring).
+event NodeA_GWN_end(bitstring).
+event Device_GWN_begin(bitstring).
+event GWN_Device_end(bitstring).
+event NodeA_GWN_begin(bitstring).
+event GWN_NodeA_end(bitstring).
+
+(*query*)
+query attacker(DataA).
+query attacker(DataG).
+query attacker(DataD).
+query attacker(DataE).
+query attacker(DataF).
+query attacker(DataF).
+query attacker(DataG).
+
+(*correspondence assertions*)
+query t:bitstring; inj-event(NodeA_GWN_end(t)) ==> inj-event(NodeA_GWN_begin(t)).
+query t:bitstring; event(GWN_Device_end(t)) ==> event(GWN_Device_begin(t)).
+query t:bitstring; event(GWN_NodeA_end(t)) ==> event(GWN_NodeA_begin(t)).
+query t:bitstring; inj-event(Device_GWN_end(t)) ==> inj-event(Device_GWN_begin(t)).
+
+(*SDB*)
+let processNodeB(DataD:bitstring,DataE:bitstring,DataF:bitstring,GWN:bitstring,NodeB:bitstring,skB : bitstring,CB : bitstring) =
+	let RB = Response(CB) in
+	new r0 : bitstring;
+	new m0 : bitstring;
+	new a : bitstring;
+	let RB_1 = XOR(RB, a) in
+	let pkB = a_mul_G(skB, G) in
+	
+	out(B2RC,(pkB, r0, m0, RB_1)); 
+	in(B2RC,(MN2:bitstring,IDB:bitstring, TIDB:bitstring));
+	let kB_star = get_kA_star(m0,r0,skB) in
+	
+	
+	in(B2GWN,(L2:bitstring, M2:bitstring, T2:bitstring));
+	
+	let X_GWN_B = DXOR_getSecond(MN2, RB_1) in 
+	let IDA = Separate1(DXOR_getFirst(L2, Hash4(X_GWN_B, T2,IDB,pkB))) in
+	let r1 = Separate2(DXOR_getFirst(L2, Hash4(X_GWN_B, T2,IDB,pkB))) in
+	let M2_1 = Hash5(r1, L2, X_GWN_B, T2, IDA) in
+	if (M2 = M2_1) then
+	new r2 : bitstring;
+	new T3 : bitstring;
+	let r2_1 = Hash2(r2, T3) in
+	out(B2GWN, aenc(DataD,r2));
+	let TIDB_new = Hash3(r2_1,TIDB,IDA) in
+	let m2 = get_m1(kB_star,r2_1,skB) in
+	out(B2GWN, aenc(DataF, IDB));
+	let SK = Hash4(r1, r2, IDA, IDB) in
+	let L3 = XOR(r2, Hash4(X_GWN_B, T3,m2,pkB)) in
+	let DID2_1 = XOR(Hash3(r2_1,m2,T3), IDA) in
+	 out(B2GWN, aenc(DataE,X_GWN_B));
+	event GWN_Device_begin(GWN);
+	out(B2GWN, (L3,m2,DID2_1, T3, TIDB));
+	event Device_GWN_end(NodeB);
+
+	0.
+
+(*SDA*)
+let processNodeA(DataA:bitstring,DataB:bitstring,DataC:bitstring,DataG:bitstring,GWN:bitstring,NodeA:bitstring,skA : bitstring,CA : bitstring) =
+	let RA = Response(CA) in
+	new r0 : bitstring;
+	new m0 : bitstring;
+	new a : bitstring;
+	let RA_1 = XOR(RA, a) in
+	let pkA = a_mul_G(skA, G) in
+	
+	out(A2RC, (pkA, r0, m0, RA_1)); 
+	in(A2RC, (MN1:bitstring,IDA:bitstring,TIDA:bitstring,IDB:bitstring));   
+	
+	out(A2GWN_PRIVATE,(IDA));
+	let X_GWN_A = DXOR_getSecond(MN1, RA_1) in 
+	let kA_star = get_kA_star(m0,r0,skA) in
+	
+	
+	
+	event GWN_NodeA_begin(GWN);
+	new r1 : bitstring;
+	out(B2GWN, aenc(DataA,r1));
+	new T1 : bitstring;
+	let r1_1 = Hash2(r1, T1) in    
+	let m1 = get_m1(kA_star,r1_1,skA) in
+	out(B2GWN, aenc(DataB,IDA)); 
+	let L1 = XOR(r1, Hash4(X_GWN_A, T1, m1,pkA)) in
+	let DID1_1 = XOR(Hash3(r1_1,m1,T1), IDB) in
+	out(A2GWN,(L1, m1,DID1_1, T1, TIDA));
+	
+	out(A2GWN, aenc(DataC,X_GWN_A));   
+	
+	in(A2GWN,(L4:bitstring, M3:bitstring, T4:bitstring));
+	if(r1 = r1) then
+	
+	let IDB' = Separate1(DXOR_getFirst(L4, Hash4(X_GWN_A, T4,IDA,pkA))) in
+	
+	let r2 = Separate2(DXOR_getFirst(L4, Hash4(X_GWN_A, T4,IDA,pkA))) in
+	let TIDA_new = Hash3(r1_1,TIDA,IDB) in
+	let M3_1 = Hash5(r2, L4, X_GWN_A ,T4, IDB) in
+	
+	if M3 = M3_1 then
+	
+	let SK = Hash4(r1, r2, IDA, IDB) in
+	event NodeA_GWN_end(NodeA);
+	out(A2GWN, aenc(DataG,SK));
+	0.
+
+(*RA Registration Center*)
+let processThirdParty(xp:bitstring) =	
+	in(B2RC,(pkB:bitstring, r0_2:bitstring, m0_2:bitstring, RB_1:bitstring));
+	new B1 : bitstring;
+	new TIDB : bitstring;
+	let IDB = CH(m0_2, r0_2, pkB) in
+	let X_GWN_B = Hash3(IDB, B1, pkB) in
+	
+	let MN2 = XOR(RB_1, X_GWN_B) in
+	
+	insert DeviceTable(IDB,X_GWN_B,pkB,TIDB);
+	out(B2RC,(MN2,IDB, TIDB));  
+	
+	in(A2RC,(pkA:bitstring, r0:bitstring, m0:bitstring, RA_1:bitstring));
+	let IDA = CH(m0, r0, pkA) in
+	new B0 : bitstring;
+	new TIDA : bitstring;
+	let X_GWN_A = Hash3(IDA, B0, pkA) in
+	let MN1 = XOR(RA_1, X_GWN_A) in
+	
+	insert NodeAsTable(IDA,X_GWN_A,pkA,TIDA);
+	out(A2RC,(MN1,IDA,TIDA,IDB));
+	0.
+
+(*Gateway*)
+let process_GWN(NodeA:bitstring,GWN:bitstring, NodeB:bitstring)=
+	in(A2GWN_PRIVATE,(IDA:bitstring));
+	
+	get NodeAsTable(=IDA,X_GWN_A,pkA,TIDA) in 
+	in(A2GWN, (L1:bitstring ,m1:bitstring ,DID1_1:bitstring, T1:bitstring, TIDA':bitstring));
+	    
+	let r1 = DXOR_getFirst(L1, Hash4(X_GWN_A, T1, m1,pkA)) in
+	let r1_1 = Hash2(r1, T1) in
+
+	let pkA' = a_mul_G(D_get_new_CH(get_new_CH(m1,r1_1,pkA)),G) in
+	
+	if (pkA' = pkA) then
+	let IDB = DXOR_getSecond(DID1_1, Hash3(r1_1,m1,T1)) in
+	
+	event Device_GWN_begin(NodeB);	
+	get DeviceTable(=IDB,X_GWN_B,pkB,TIDB) in  
+	new T2 : bitstring;
+	let L2 = XOR(Concat(IDA,r1), Hash4(X_GWN_B,T2 ,IDB, pkB)) in
+	let M2 = Hash5(r1, L2, X_GWN_B, T2, IDA) in
+	
+	out(B2GWN,(L2, M2, T2));
+	
+	in(B2GWN, (L3:bitstring,m2:bitstring,DID2_1:bitstring, T3:bitstring, TIDB':bitstring));
+	let r2 = DXOR_getFirst(L3, Hash4(X_GWN_B, T3, m2,pkB)) in
+	let r2_1 = Hash2(r2, T3) in
+	let pkB' = a_mul_G(D_get_new_CH(get_new_CH(m2,r2_1,pkB)),G) in     
+	
+	
+	if (pkB' = pkB) then
+	
+	event GWN_Device_end(GWN);
+
+	event NodeA_GWN_begin(NodeA);
+	
+	let IDA = DXOR_getSecond(DID2_1,Hash3(r2_1,m2,T3)) in
+	
+	let TIDA_new = Hash3(r1_1,TIDA,IDB) in
+	let TIDB_new = Hash3(r2_1,TIDB,IDA) in
+	
+	new T4 : bitstring;
+	let L4 = XOR(Concat(IDB, r2), Hash4(X_GWN_A, T4, IDA, pkA)) in
+	let M3 = Hash5(r2, L4, X_GWN_A, T4, IDB) in 
+	let SK = Hash4(r1, r2, IDA, IDB) in
+	
+	
+	out(A2GWN,(L4, M3, T4)); 
+	event GWN_NodeA_end(GWN); 
+	
+	0.
+
+(*main*)
+process 
+	new GWN:bitstring; 
+	new NodeB:bitstring; 
+	new NodeA:bitstring;
+	new CA : bitstring;
+	new skA : bitstring;
+	
+	new xp : bitstring;
+	
+	new CB : bitstring;
+	new skB : bitstring;
+	
+   ( !(processThirdParty(xp)) | (!processNodeB(DataD,DataE,DataF,GWN,NodeB,skB,CB)) | (!processNodeA(DataA,DataB,DataC,DataG,GWN,NodeA,skA,CA)) |(!process_GWN(NodeA,GWN, NodeB)) )  
+
+	
